@@ -132,60 +132,45 @@
   level.rightEdge = 800;
   addCheckpoint(600,'A');
 
-  function generateEasy(startX,endX){
-    // 连续地面 + 低矮平台，偶尔弹簧/移动台
-    addPlatform(startX, GROUND_Y, SEG_W, 80);
-    const n = randi(2,3);
-    let lastY = randi(GROUND_Y-120, GROUND_Y-90);
-    let lastX = startX + randi(80,160);
-    for(let i=0;i<n;i++){
-      const w = randi(140,220);
-      const dx = randi(80, EASY_GAP);
-      let y = clamp(lastY + randi(-EASY_STEP, EASY_STEP), GROUND_Y-200, GROUND_Y-90);
-      const x = Math.min(lastX + dx, endX - 140);
-      addPlatform(x,y,w,24);
-      // 20% 移动平台替换
-      if(Math.random()<0.2){ level.platforms.pop(); addMover(x,y,w,18, x-80, x+80, rand(40,70)); }
-      // 30% 弹簧
-      if(Math.random()<0.3) addSpring(x+w*0.5, y-12, 1100);
-      // 硬币串
-      const cN = randi(2,4); for(let k=0;k<cN;k++) addCoin(x+18+k*18, y-38);
-      lastX = x; lastY = y;
-    }
-    // 地面小陷阱
-    if(Math.random()<0.4){ const sx = startX + randi(220, SEG_W-200); addSpike(sx, GROUND_Y-30, randi(60,120), 30); }
-    // 顶部碎砖行
-    if(Math.random()<0.3){ const bx = startX + randi(120, SEG_W-220); for(let i=0;i<randi(3,5);i++){ addBrick(bx+i*34, GROUND_Y-220, 32, 24, 1); if(Math.random()<0.5) addCoin(bx+i*34+16, GROUND_Y-260); } }
-  }
-  function generateHard(startX,endX){
-    // 更高的平台、更大的空隙、移动台作为必经
-    addPlatform(startX, GROUND_Y, SEG_W, 80);
-    // 中高台链
-    let y = randi(GROUND_Y-220, GROUND_Y-140);
-    let x = startX + randi(80,140);
-    for(let i=0;i<randi(2,3);i++){
-      const w = randi(120,180);
-      const dx = randi(90, HARD_GAP);
-      y = clamp(y + randi(-HARD_STEP, HARD_STEP), GROUND_Y-280, GROUND_Y-120);
-      x = Math.min(x + dx, endX - 140);
-      // 50% 移动台，50% 固定台
-      if(Math.random()<0.5) addMover(x,y,w,18, x-100, x+100, rand(60,90));
-      else addPlatform(x,y,w,24);
-      // 40% 弹簧以过缝/上更高
-      if(Math.random()<0.4) addSpring(x+w*0.5, y-12, 1200);
-      // 碎砖群（需从下顶破）
-      if(Math.random()<0.5){ for(let t=0;t<randi(2,4);t++){ addBrick(x+16+t*34, y-40, 32, 24, 1); } }
-    }
-    // 地面宽陷阱
-    if(Math.random()<0.7){ const sx = startX + randi(160, SEG_W-160); addSpike(sx, GROUND_Y-30, randi(120,180), 30); }
-  }
-
+  // ===== 新AI关卡生成器：平台链+事件点，流畅且逻辑 =====
   function generateSegment(){
     const startX = level.rightEdge;
     const endX = startX + SEG_W;
-    const mode = Math.random()<0.8 ? 'easy' : 'hard';
-    if(mode==='easy') generateEasy(startX,endX); else generateHard(startX,endX);
-    // 每 2 段一个检查点（A..Z 循环）
+    // 平台链参数
+    let chainLen = randi(4,6);
+    let lastY = randi(GROUND_Y-120, GROUND_Y-80);
+    let lastX = startX + randi(60,100);
+    let lastW = randi(120,180);
+    for(let i=0;i<chainLen;i++){
+      // 平台宽度递进有序
+      const w = clamp(lastW + randi(-20,30), 100, 220);
+      // 间隔递进有序，保证可跳跃
+      const dx = clamp(randi(80, 140) + i*8, 80, 180);
+      // 高度变化平滑且有序
+      let y = clamp(lastY + randi(-40,40), GROUND_Y-200, GROUND_Y-60);
+      // 保证不会突然高低错落
+      if(Math.abs(y-lastY)>60) y = lastY + Math.sign(y-lastY)*60;
+      const x = Math.min(lastX + dx, endX - 120);
+      // 90% 固定台，10%移动台
+      if(Math.random()<0.1) addMover(x,y,w,18, x-60, x+60, rand(40,70));
+      else addPlatform(x,y,w,24);
+      // 事件点：
+      // 20%弹簧
+      if(Math.random()<0.2) addSpring(x+w*0.5, y-12, randi(950,1200));
+      // 30%金币串
+      if(Math.random()<0.3){ const cN = randi(2,4); for(let k=0;k<cN;k++) addCoin(x+18+k*18, y-38); }
+      // 15%碎砖
+      if(Math.random()<0.15){ for(let t=0;t<randi(2,4);t++){ addBrick(x+16+t*34, y-40, 32, 24, 1); } }
+      lastX = x; lastY = y; lastW = w;
+    }
+    // 地面连续性
+    addPlatform(startX, GROUND_Y, SEG_W, 80);
+    // 30%地刺陷阱，保证不会必死
+    if(Math.random()<0.3){
+      const sx = startX + randi(180, SEG_W-180);
+      addSpike(sx, GROUND_Y, randi(60,120), 30);
+    }
+    // 检查点
     const segIndex = Math.floor(endX / SEG_W);
     if(segIndex % 2 === 0){ const id = String.fromCharCode('A'.charCodeAt(0) + (segIndex/2)%26); addCheckpoint(endX-60, id); }
     level.rightEdge = endX;
