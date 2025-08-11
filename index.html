@@ -272,7 +272,7 @@
       const future = {x:nx, y:ny, w:player.w, h:player.h};
       if(aabb(future, plat)){
         if(player.vy>0){ // 落到顶面
-          ny = plat.y - player.h; player.vy = 0; player.onGround = true; player.lastGroundTime = time; player.jumpsLeft = 1; // 保留一段空中跳
+          ny = plat.y - player.h; player.vy = 0; player.onGround = true; player.lastGroundTime = time; player.jumpsLeft = 2; // 落地重置为2段跳
           if(p._isMover) { landedOnMover = p; }
         } else if(player.vy<0){ // 顶到底面
           ny = plat.y + plat.h; player.vy = 0;
